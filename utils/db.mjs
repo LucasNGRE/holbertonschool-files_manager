@@ -1,5 +1,6 @@
 // utils/db.mjs
 import mongodb from 'mongodb';
+
 const { MongoClient } = mongodb;
 
 const host = process.env.DB_HOST || 'localhost';
