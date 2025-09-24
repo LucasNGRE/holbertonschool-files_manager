@@ -10,13 +10,11 @@ const ACCEPTED_TYPES = ['folder', 'file', 'image'];
 
 // Crée le dossier de stockage au démarrage
 const folderPath = (process.env.FOLDER_PATH && process.env.FOLDER_PATH.trim()) || '/tmp/files_manager';
-
 if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
 
 class FilesController {
   static async postUpload(req, res) {
     try {
-      // Vérification du token
       const token = req.headers['x-token'];
       if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -33,7 +31,7 @@ class FilesController {
       const { db } = dbClient;
       const filesCollection = db.collection('files');
 
-      // Vérification du parent si différent de '0'
+      // Vérification du parent
       let parentObj = null;
       if (parentId !== '0') {
         try {
@@ -53,7 +51,6 @@ class FilesController {
         parentId: parentId === '0' ? '0' : new ObjectId(parentId),
       };
 
-      // Si c'est un fichier ou une image, on écrit le fichier sur le disque
       if (type !== 'folder') {
         const localFilename = uuidv4();
         const localPath = path.join(folderPath, localFilename);
@@ -69,10 +66,89 @@ class FilesController {
         type: fileDocument.type,
         isPublic: fileDocument.isPublic,
         userId: fileDocument.userId.toString(),
-        parentId: fileDocument.parentId === '0' ? '0' : fileDocument.parentId.toString(),
+        parentId:
+    fileDocument.parentId === '0'
+      ? '0'
+      : fileDocument.parentId.toString(),
       });
     } catch (err) {
       console.error('Upload error:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+  }
+
+  // Récupère un fichier par son ID
+  static async getShow(req, res) {
+    try {
+      const token = req.headers['x-token'];
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { db } = dbClient;
+      const filesCollection = db.collection('files');
+      const fileId = req.params.id;
+
+      let file;
+      try {
+        file = await filesCollection.findOne({
+          _id: new ObjectId(fileId),
+          userId: new ObjectId(userId),
+        });
+      } catch (err) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      if (!file) return res.status(404).json({ error: 'Not found' });
+
+      const resParentId = file.parentId === '0' ? '0' : file.parentId.toString();
+      return res.status(200).json({
+        id: file._id.toString(),
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        userId: file.userId.toString(),
+        parentId: resParentId,
+      });
+    } catch (err) {
+      console.error('getShow error:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+  }
+
+  // Liste les fichiers d’un utilisateur avec pagination et parentId
+  static async getIndex(req, res) {
+    try {
+      const token = req.headers['x-token'];
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const parentIdQuery = req.query.parentId || '0';
+      let page = parseInt(req.query.page, 10);
+      if (Number.isNaN(page) || page < 0) page = 0;
+
+      const { db } = dbClient;
+      const filesCollection = db.collection('files');
+
+      const filterParentId = parentIdQuery === '0' ? '0' : new ObjectId(parentIdQuery);
+
+      const files = await filesCollection
+        .find({ userId: new ObjectId(userId), parentId: filterParentId })
+        .skip(page * 20)
+        .limit(20)
+        .toArray();
+
+      const result = files.map((file) => ({
+        id: file._id.toString(),
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        userId: file.userId.toString(),
+        parentId: file.parentId === '0' ? '0' : file.parentId.toString(),
+      }));
+
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error('getIndex error:', err);
       return res.status(500).json({ error: 'Server error' });
     }
   }
