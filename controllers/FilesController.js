@@ -12,7 +12,6 @@ const ACCEPTED_TYPES = ['folder', 'file', 'image'];
 const folderPath = (process.env.FOLDER_PATH && process.env.FOLDER_PATH.trim()) || '/tmp/files_manager';
 if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
 
-// --- Bull queue pour la génération de thumbnails ---
 const fileQueue = new Queue('fileQueue');
 
 class FilesController {
@@ -62,7 +61,6 @@ class FilesController {
 
       const result = await filesCollection.insertOne(fileDocument);
 
-      // --- AJOUT DU JOB SI IMAGE ---
       if (type === 'image') {
         await fileQueue.add({
           userId: userId.toString(),
