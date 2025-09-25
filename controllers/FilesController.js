@@ -213,9 +213,15 @@ class FilesController {
       } catch (err) {
         return res.status(404).json({ error: 'Not found' });
       }
-      if (!file) return res.status(404).json({ error: 'Not found' });
-      if (file.type === 'folder') return res.status(400).json({ error: "A folder doesn't have content" });
 
+      if (!file) return res.status(404).json({ error: 'Not found' });
+
+      // ✅ Vérifier d'abord si c'est un dossier
+      if (file.type === 'folder') {
+        return res.status(400).json({ error: "A folder doesn't have content" });
+      }
+
+      // ✅ Puis gérer la visibilité/autorisation
       if (!file.isPublic) {
         const token = req.headers['x-token'];
         if (!token) return res.status(404).json({ error: 'Not found' });
