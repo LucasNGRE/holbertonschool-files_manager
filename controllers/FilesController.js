@@ -9,7 +9,6 @@ import redisClient from '../utils/redis';
 
 const ACCEPTED_TYPES = ['folder', 'file', 'image'];
 
-// Crée le dossier de stockage au démarrage
 const folderPath = (process.env.FOLDER_PATH && process.env.FOLDER_PATH.trim()) || '/tmp/files_manager';
 if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
 
@@ -32,7 +31,6 @@ class FilesController {
       const { db } = dbClient;
       const filesCollection = db.collection('files');
 
-      // Vérification du parent
       let parentObj = null;
       if (parentId !== '0') {
         try {
@@ -78,7 +76,6 @@ class FilesController {
     }
   }
 
-  // Récupère un fichier par son ID
   static async getShow(req, res) {
     try {
       const token = req.headers['x-token'];
@@ -116,7 +113,6 @@ class FilesController {
     }
   }
 
-  // Liste les fichiers d’un utilisateur avec pagination et parentId
   static async getIndex(req, res) {
     try {
       const token = req.headers['x-token'];
@@ -216,12 +212,10 @@ class FilesController {
 
       if (!file) return res.status(404).json({ error: 'Not found' });
 
-      // ✅ Vérifier d'abord si c'est un dossier
       if (file.type === 'folder') {
         return res.status(400).json({ error: "A folder doesn't have content" });
       }
 
-      // ✅ Puis gérer la visibilité/autorisation
       if (!file.isPublic) {
         const token = req.headers['x-token'];
         if (!token) return res.status(404).json({ error: 'Not found' });
